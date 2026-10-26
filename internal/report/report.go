@@ -162,6 +162,10 @@ var (
 	ansiCSI = regexp.MustCompile(`\x1b\[[0-?]*[ -/]*[@-~]`)
 )
 
+func Sanitize(s string) string {
+	return sanitize(s)
+}
+
 func sanitize(s string) string {
 	s = strings.ToValidUTF8(s, "�")
 	s = ansiOSC.ReplaceAllString(s, "")
