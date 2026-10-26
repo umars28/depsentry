@@ -142,19 +142,54 @@ func fixedVersions(v osv.Vuln, name string) []string {
 	return out
 }
 
+var advisoryID = regexp.MustCompile(`(?i)CVE-\d{4}-\d{4,}|GHSA(?:-[0-9a-z]{4}){3}`)
+
 func links(v osv.Vuln) []string {
-	var out []string
+	own := map[string]bool{strings.ToUpper(v.ID): true}
+	for _, a := range v.Aliases {
+		own[strings.ToUpper(a)] = true
+	}
+
+	var matched, idFree string
 	for _, r := range v.References {
-		if r.Type != "ADVISORY" {
+		if r.Type != "ADVISORY" || !safeLink(r.URL) {
 			continue
 		}
-		u, err := url.Parse(r.URL)
-		if err == nil && (u.Scheme == "https" || u.Scheme == "http") && u.Host != "" && u.User == nil {
-			out = append(out, r.URL)
+		ids := advisoryID.FindAllString(r.URL, -1)
+		if len(ids) == 0 {
+			if idFree == "" {
+				idFree = r.URL
+			}
+			continue
+		}
+		if allOwn(ids, own) {
+			matched = r.URL
 			break
 		}
 	}
+
+	var out []string
+	switch {
+	case matched != "":
+		out = append(out, matched)
+	case idFree != "":
+		out = append(out, idFree)
+	}
 	return append(out, "https://osv.dev/vulnerability/"+url.PathEscape(v.ID))
+}
+
+func safeLink(raw string) bool {
+	u, err := url.Parse(raw)
+	return err == nil && (u.Scheme == "https" || u.Scheme == "http") && u.Host != "" && u.User == nil
+}
+
+func allOwn(ids []string, own map[string]bool) bool {
+	for _, id := range ids {
+		if !own[strings.ToUpper(id)] {
+			return false
+		}
+	}
+	return true
 }
 
 var (
