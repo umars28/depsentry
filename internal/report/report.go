@@ -142,19 +142,85 @@ func fixedVersions(v osv.Vuln, name string) []string {
 	return out
 }
 
+var advisoryID = regexp.MustCompile(`(?i)CVE-\d{4}-\d{4,}|GHSA(?:-[0-9a-z]{4}){3}`)
+
 func links(v osv.Vuln) []string {
-	var out []string
+	own := map[string]bool{strings.ToUpper(v.ID): true}
+	for _, a := range v.Aliases {
+		own[strings.ToUpper(a)] = true
+	}
+
+	var matched, idFree string
 	for _, r := range v.References {
 		if r.Type != "ADVISORY" {
 			continue
 		}
-		u, err := url.Parse(r.URL)
-		if err == nil && (u.Scheme == "https" || u.Scheme == "http") && u.Host != "" && u.User == nil {
-			out = append(out, r.URL)
+		u, ok := parseSafeLink(r.URL)
+		if !ok {
+			continue
+		}
+		parts := strings.Join([]string{u.Hostname(), u.Path, decodedQuery(u), u.Fragment}, " ")
+		matches := advisoryID.FindAllStringIndex(parts, -1)
+		if len(matches) == 0 {
+			if idFree == "" {
+				idFree = r.URL
+			}
+			continue
+		}
+		if allOwn(parts, matches, own) && advisoryID.MatchString(u.Path) {
+			matched = r.URL
 			break
 		}
 	}
+
+	var out []string
+	switch {
+	case matched != "":
+		out = append(out, matched)
+	case idFree != "":
+		out = append(out, idFree)
+	}
 	return append(out, "https://osv.dev/vulnerability/"+url.PathEscape(v.ID))
+}
+
+func parseSafeLink(raw string) (*url.URL, bool) {
+	u, err := url.Parse(raw)
+	if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" || u.User != nil {
+		return nil, false
+	}
+	return u, true
+}
+
+func decodedQuery(u *url.URL) string {
+	q, err := url.QueryUnescape(u.RawQuery)
+	if err != nil {
+		return u.RawQuery
+	}
+	return q
+}
+
+func allOwn(raw string, matches [][]int, own map[string]bool) bool {
+	for _, m := range matches {
+		id := raw[m[0]:m[1]]
+		if !own[strings.ToUpper(id)] || glued(raw, m[0], m[1], strings.HasPrefix(strings.ToUpper(id), "GHSA")) {
+			return false
+		}
+	}
+	return true
+}
+
+func glued(raw string, start, end int, ghsa bool) bool {
+	if start > 0 && isAlnum(raw[start-1]) {
+		return true
+	}
+	if end < len(raw) && isAlnum(raw[end]) {
+		return true
+	}
+	return ghsa && end+1 < len(raw) && raw[end] == '-' && isAlnum(raw[end+1])
+}
+
+func isAlnum(c byte) bool {
+	return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
 }
 
 var (

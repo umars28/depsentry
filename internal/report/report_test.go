@@ -129,7 +129,7 @@ func TestFixedVersions_AC3_4(t *testing.T) {
 }
 
 func TestLinks_AC3_5(t *testing.T) {
-	v := osv.Vuln{ID: "GHSA-35jh-r3h4-6jhm", References: []osv.Reference{
+	v := osv.Vuln{ID: "GHSA-35jh-r3h4-6jhm", Aliases: []string{"CVE-2021-23337"}, References: []osv.Reference{
 		{Type: "WEB", URL: "https://example.com/blog"},
 		{Type: "ADVISORY", URL: "javascript:alert(1)"},
 		{Type: "ADVISORY", URL: "ftp://example.com/adv"},
@@ -443,5 +443,195 @@ func TestWrite_AC3_8_SingularNouns(t *testing.T) {
 	lines := strings.Split(strings.TrimSuffix(b.String(), "\n"), "\n")
 	if got, want := lines[len(lines)-1], "Checked 1 package: 1 vulnerable, 1 vulnerability (1 HIGH), 1 skipped."; got != want {
 		t.Fatalf("summary line = %q, want %q", got, want)
+	}
+}
+
+func TestLinks_AC5(t *testing.T) {
+	const osvPrefix = "https://osv.dev/vulnerability/"
+	cases := []struct {
+		name string
+		v    osv.Vuln
+		want string
+	}{
+		{
+			"AC5.5 regression GHSA-898c-q2cr-xwhg",
+			osv.Vuln{ID: "GHSA-898c-q2cr-xwhg", Aliases: []string{"CVE-2026-44490"}, References: []osv.Reference{
+				{Type: "WEB", URL: "https://github.com/axios/axios/security/advisories/GHSA-898c-q2cr-xwhg"},
+				{Type: "ADVISORY", URL: "https://nvd.nist.gov/vuln/detail/CVE-2018-16487"},
+				{Type: "ADVISORY", URL: "https://nvd.nist.gov/vuln/detail/CVE-2026-44490"},
+				{Type: "PACKAGE", URL: "https://github.com/axios/axios"},
+			}},
+			"https://nvd.nist.gov/vuln/detail/CVE-2026-44490",
+		},
+		{
+			"AC5.1 own OSV id",
+			osv.Vuln{ID: "GHSA-aaaa-bbbb-cccc", References: []osv.Reference{
+				{Type: "ADVISORY", URL: "https://github.com/advisories/GHSA-zzzz-yyyy-xxxx"},
+				{Type: "ADVISORY", URL: "https://github.com/advisories/GHSA-aaaa-bbbb-cccc"},
+			}},
+			"https://github.com/advisories/GHSA-aaaa-bbbb-cccc",
+		},
+		{
+			"AC5.1 own id beats earlier id-free link",
+			osv.Vuln{ID: "GHSA-aaaa-bbbb-cccc", Aliases: []string{"CVE-2024-1234"}, References: []osv.Reference{
+				{Type: "ADVISORY", URL: "https://vendor.example/bulletin/42"},
+				{Type: "ADVISORY", URL: "https://nvd.nist.gov/vuln/detail/CVE-2024-1234"},
+			}},
+			"https://nvd.nist.gov/vuln/detail/CVE-2024-1234",
+		},
+		{
+			"AC5.1 own id plus foreign id rejected",
+			osv.Vuln{ID: "GHSA-aaaa-bbbb-cccc", Aliases: []string{"CVE-2024-1234"}, References: []osv.Reference{
+				{Type: "ADVISORY", URL: "https://example.com/compare/CVE-2024-1234-vs-CVE-2018-16487"},
+				{Type: "ADVISORY", URL: "https://nvd.nist.gov/vuln/detail/CVE-2024-1234"},
+			}},
+			"https://nvd.nist.gov/vuln/detail/CVE-2024-1234",
+		},
+		{
+			"AC5.2 fallback to id-free link",
+			osv.Vuln{ID: "GHSA-aaaa-bbbb-cccc", Aliases: []string{"CVE-2024-1234"}, References: []osv.Reference{
+				{Type: "ADVISORY", URL: "https://nvd.nist.gov/vuln/detail/CVE-2018-16487"},
+				{Type: "ADVISORY", URL: "https://vendor.example/bulletin/42"},
+			}},
+			"https://vendor.example/bulletin/42",
+		},
+		{
+			"AC5.4 prefix CVE is not a match",
+			osv.Vuln{ID: "GHSA-aaaa-bbbb-cccc", Aliases: []string{"CVE-2021-1234"}, References: []osv.Reference{
+				{Type: "ADVISORY", URL: "https://nvd.nist.gov/vuln/detail/CVE-2021-12345"},
+				{Type: "ADVISORY", URL: "https://nvd.nist.gov/vuln/detail/CVE-2021-1234"},
+			}},
+			"https://nvd.nist.gov/vuln/detail/CVE-2021-1234",
+		},
+		{
+			"AC5.4 case insensitive",
+			osv.Vuln{ID: "GHSA-aaaa-bbbb-cccc", References: []osv.Reference{
+				{Type: "ADVISORY", URL: "https://github.com/advisories/ghsa-aaaa-bbbb-cccc"},
+			}},
+			"https://github.com/advisories/ghsa-aaaa-bbbb-cccc",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			want := []string{tc.want, osvPrefix + tc.v.ID}
+			if got := links(tc.v); !reflect.DeepEqual(got, want) {
+				t.Fatalf("links = %v, want %v", got, want)
+			}
+		})
+	}
+}
+
+func TestLinks_AC5_3_OnlyForeignAdvisories(t *testing.T) {
+	v := osv.Vuln{ID: "GHSA-aaaa-bbbb-cccc", Aliases: []string{"CVE-2024-1234"}, References: []osv.Reference{
+		{Type: "ADVISORY", URL: "https://nvd.nist.gov/vuln/detail/CVE-2018-16487"},
+		{Type: "ADVISORY", URL: "https://github.com/advisories/GHSA-zzzz-yyyy-xxxx"},
+		{Type: "WEB", URL: "https://nvd.nist.gov/vuln/detail/CVE-2024-1234"},
+	}}
+	want := []string{"https://osv.dev/vulnerability/GHSA-aaaa-bbbb-cccc"}
+	if got := links(v); !reflect.DeepEqual(got, want) {
+		t.Fatalf("links = %v, want %v", got, want)
+	}
+}
+
+func TestWrite_AC5_5_RegressionOutput(t *testing.T) {
+	dependencies := []deps.Dependency{{Name: "axios", Version: "0.21.0", Source: deps.SourceLockfile}}
+	results := []osv.Result{{Package: osv.Package{Name: "axios", Version: "0.21.0"}, Vulns: []osv.Vuln{{
+		ID:      "GHSA-898c-q2cr-xwhg",
+		Aliases: []string{"CVE-2026-44490"},
+		References: []osv.Reference{
+			{Type: "ADVISORY", URL: "https://nvd.nist.gov/vuln/detail/CVE-2018-16487"},
+			{Type: "ADVISORY", URL: "https://nvd.nist.gov/vuln/detail/CVE-2026-44490"},
+		},
+	}}}}
+	var b strings.Builder
+	if _, err := Write(&b, dependencies, results); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	if strings.Contains(b.String(), "CVE-2018-16487") {
+		t.Fatalf("output links an unrelated CVE:\n%s", b.String())
+	}
+	if !strings.Contains(b.String(), "https://nvd.nist.gov/vuln/detail/CVE-2026-44490") {
+		t.Fatalf("output missing the matching advisory link:\n%s", b.String())
+	}
+}
+
+func TestLinks_AC3_5_UnsafeBeforeSafe(t *testing.T) {
+	cases := []struct {
+		name string
+		refs []osv.Reference
+		want string
+	}{
+		{"id-free path", []osv.Reference{
+			{Type: "ADVISORY", URL: "javascript:alert(1)"},
+			{Type: "ADVISORY", URL: "ftp://example.com/adv"},
+			{Type: "ADVISORY", URL: "https:///no-host"},
+			{Type: "ADVISORY", URL: "https://user@evil.example/adv"},
+			{Type: "ADVISORY", URL: "https://vendor.example/bulletin/42"},
+		}, "https://vendor.example/bulletin/42"},
+		{"own-id path", []osv.Reference{
+			{Type: "ADVISORY", URL: "javascript:alert('CVE-2021-23337')"},
+			{Type: "ADVISORY", URL: "ftp://example.com/CVE-2021-23337"},
+			{Type: "ADVISORY", URL: "https:///CVE-2021-23337"},
+			{Type: "ADVISORY", URL: "https://user@evil.example/CVE-2021-23337"},
+			{Type: "ADVISORY", URL: "https://nvd.nist.gov/vuln/detail/CVE-2021-23337"},
+		}, "https://nvd.nist.gov/vuln/detail/CVE-2021-23337"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			v := osv.Vuln{ID: "GHSA-35jh-r3h4-6jhm", Aliases: []string{"CVE-2021-23337"}, References: tc.refs}
+			want := []string{tc.want, "https://osv.dev/vulnerability/GHSA-35jh-r3h4-6jhm"}
+			if got := links(v); !reflect.DeepEqual(got, want) {
+				t.Fatalf("links = %v, want %v", got, want)
+			}
+		})
+	}
+}
+
+func TestLinks_AC5_4_Boundaries(t *testing.T) {
+	v := osv.Vuln{ID: "GHSA-aaaa-bbbb-cccc", Aliases: []string{"CVE-2021-1234"}, References: []osv.Reference{
+		{Type: "ADVISORY", URL: "https://github.com/advisories/GHSA-aaaa-bbbb-cccc-dddd"},
+		{Type: "ADVISORY", URL: "https://github.com/advisories/GHSA-aaaa-bbbb-ccccdddd"},
+		{Type: "ADVISORY", URL: "https://example.com/XCVE-2021-1234"},
+		{Type: "ADVISORY", URL: "https://example.com/CVE-2021-1234x"},
+		{Type: "ADVISORY", URL: "https://nvd.nist.gov/vuln/detail/CVE-2021-1234"},
+	}}
+	want := []string{"https://nvd.nist.gov/vuln/detail/CVE-2021-1234", "https://osv.dev/vulnerability/GHSA-aaaa-bbbb-cccc"}
+	if got := links(v); !reflect.DeepEqual(got, want) {
+		t.Fatalf("links = %v, want %v", got, want)
+	}
+}
+
+func TestLinks_AC5_6_DecodedPath(t *testing.T) {
+	const own = "https://nvd.nist.gov/vuln/detail/CVE-2026-44490"
+	const vendor = "https://vendor.example/bulletin/42"
+	cases := []struct {
+		name string
+		refs []string
+		want string
+	}{
+		{"own id only in query", []string{"https://evil.example/?x=CVE-2026-44490", own}, own},
+		{"own id only in fragment", []string{"https://evil.example/page#CVE-2026-44490", own}, own},
+		{"own id only in host", []string{"https://cve-2026-44490.evil.example/", own}, own},
+		{"own id only outside path and nothing else", []string{"https://evil.example/?x=CVE-2026-44490"}, ""},
+		{"percent-encoded own id in path", []string{"https://nvd.nist.gov/vuln/detail/CVE%2D2026%2D44490"}, "https://nvd.nist.gov/vuln/detail/CVE%2D2026%2D44490"},
+		{"percent-encoded foreign id in path", []string{"https://nvd.nist.gov/vuln/detail/CVE%2D2018%2D16487", vendor}, vendor},
+		{"foreign id in query", []string{"https://vendor.example/bulletin?ref=CVE-2018-16487", vendor}, vendor},
+		{"percent-encoded foreign id in query", []string{"https://vendor.example/bulletin?ref=CVE%2D2018%2D16487", vendor}, vendor},
+		{"foreign id in fragment", []string{"https://vendor.example/bulletin#GHSA-zzzz-yyyy-xxxx", vendor}, vendor},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			v := osv.Vuln{ID: "GHSA-898c-q2cr-xwhg", Aliases: []string{"CVE-2026-44490"}}
+			for _, u := range tc.refs {
+				v.References = append(v.References, osv.Reference{Type: "ADVISORY", URL: u})
+			}
+			want := []string{"https://osv.dev/vulnerability/GHSA-898c-q2cr-xwhg"}
+			if tc.want != "" {
+				want = append([]string{tc.want}, want...)
+			}
+			if got := links(v); !reflect.DeepEqual(got, want) {
+				t.Fatalf("links = %v, want %v", got, want)
+			}
+		})
 	}
 }
