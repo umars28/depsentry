@@ -103,6 +103,11 @@ func resolveOne(name, spec string, lock *lockfile) Dependency {
 		return d
 	}
 	if v := lock.version(name); v != "" {
+		if !exactVersion.MatchString(v) {
+			d.Source = SourceSkipped
+			d.SkipReason = "lockfile version is not an exact version"
+			return d
+		}
 		d.Version = v
 		d.Source = SourceLockfile
 		return d
