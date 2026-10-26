@@ -28,6 +28,8 @@ Rule precedence: non-registry specs are always skipped. Registry specs (includin
 | AC1.9 | Missing `package.json`, malformed `package.json`, or a `dependencies`/`devDependencies` field that is not an object of strings returns an error. |
 | AC1.10 | Malformed `package-lock.json`, or a `lockfileVersion` other than 1, 2, 3, returns an error (no silent fallback to ranges). |
 | AC1.11 | `package.json` larger than 10 MiB or `package-lock.json` larger than 256 MiB returns an error instead of being read fully. |
+| AC1.12 | `package.json` or `package-lock.json` that is not a regular file after following symlinks (FIFO, device, directory) returns an error without blocking. A symlink to a regular file is read normally. Added from review 001, security finding 1. |
+| AC1.13 | A lockfile version that is not an exact version (`MAJOR.MINOR.PATCH`, optional `-prerelease`/`+build`) for a registry spec is `Source = skipped` with a reason; it is neither sent to OSV nor silently replaced by the range. Added from review 001, reviewer finding 2. |
 
 ## Out of scope
 
