@@ -66,3 +66,7 @@ VERDICT: APPROVE
 | 3 | go.mod | Toolchain still go1.27.1; no reachable vulns. | Low | Suggestion |
 
 Checked: `Dependency.Version` is only set after passing the anchored `exactVersion` regex, so URLs, aliases and ANSI escapes cannot reach it; error text has no attacker-controlled data; tests have a watchdog against hangs; no new modules.
+
+## Round 2 follow-up
+
+The Stat/Open race (reviewer 1, security-reviewer 1) was closed at the user's request: `739c3cc` test, `c03007a` fix. On unix, files are opened with `O_NONBLOCK` and the type is checked only after opening, so a FIFO swapped in cannot block. Other platforms use a plain open and the same post-open check.
