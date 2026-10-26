@@ -210,6 +210,13 @@ func checkRegular(f *os.File) (*os.File, error) {
 }
 
 func readLimited(path string, limit int) ([]byte, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, err
+	}
+	if !info.Mode().IsRegular() {
+		return nil, fmt.Errorf("%s is not a regular file", filepath.Base(path))
+	}
 	f, err := openRegular(path)
 	if err != nil {
 		return nil, err
