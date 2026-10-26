@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"unicode"
 
 	gocvss30 "github.com/pandatix/go-cvss/30"
 	gocvss31 "github.com/pandatix/go-cvss/31"
@@ -148,7 +149,7 @@ func links(v osv.Vuln) []string {
 			continue
 		}
 		u, err := url.Parse(r.URL)
-		if err == nil && (u.Scheme == "https" || u.Scheme == "http") && u.Host != "" {
+		if err == nil && (u.Scheme == "https" || u.Scheme == "http") && u.Host != "" && u.User == nil {
 			out = append(out, r.URL)
 			break
 		}
@@ -167,11 +168,11 @@ func sanitize(s string) string {
 	s = ansiCSI.ReplaceAllString(s, "")
 	return strings.Map(func(r rune) rune {
 		switch {
-		case r == '\n' || r == '\r' || r == '\t':
+		case r == '\n' || r == '\r' || r == '\t' || r == ' ' || r == ' ':
 			return ' '
 		case r < 0x20 || r == 0x7f || (r >= 0x80 && r < 0xa0):
 			return -1
-		case (r >= 0x202a && r <= 0x202e) || (r >= 0x2066 && r <= 0x2069) || r == 0x200e || r == 0x200f || r == 0x061c:
+		case unicode.Is(unicode.Cf, r):
 			return -1
 		}
 		return r

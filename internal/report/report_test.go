@@ -394,3 +394,38 @@ func TestWrite_AC3_10_Errors(t *testing.T) {
 		}
 	})
 }
+
+func TestSanitize_AC3_9_UnicodeFormat(t *testing.T) {
+	cases := []struct {
+		in, want string
+	}{
+		{"line\u2028sep\u2029para", "line sep para"},
+		{"zero\u200bwidth\u200c\u200djoin", "zerowidthjoin"},
+		{"\ufeffbom", "bom"},
+		{"soft\u00adhyphen", "softhyphen"},
+		{"word\u2060joiner", "wordjoiner"},
+		{"tag\U000E0041\U000E007Fchars", "tagchars"},
+		{"anchor\ufff9x\ufffby", "anchorxy"},
+		{"arabic\u061cmark\u200erl\u200f", "arabicmarkrl"},
+		{"bidi\u2067iso\u206a", "bidiiso"},
+		{"lodash", "lodash"},
+		{"café ñ 日本", "café ñ 日本"},
+	}
+	for _, tc := range cases {
+		if got := sanitize(tc.in); got != tc.want {
+			t.Errorf("sanitize(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}
+
+func TestLinks_AC3_5_Userinfo(t *testing.T) {
+	v := osv.Vuln{ID: "GHSA-1", References: []osv.Reference{
+		{Type: "ADVISORY", URL: "https://github.com@evil.example/advisory"},
+		{Type: "ADVISORY", URL: "https://user:pass@nvd.nist.gov/vuln"},
+		{Type: "ADVISORY", URL: "https://github.com/advisories/GHSA-1"},
+	}}
+	want := []string{"https://github.com/advisories/GHSA-1", "https://osv.dev/vulnerability/GHSA-1"}
+	if got := links(v); !reflect.DeepEqual(got, want) {
+		t.Fatalf("links = %v, want %v", got, want)
+	}
+}
