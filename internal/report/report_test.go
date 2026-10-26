@@ -129,7 +129,7 @@ func TestFixedVersions_AC3_4(t *testing.T) {
 }
 
 func TestLinks_AC3_5(t *testing.T) {
-	v := osv.Vuln{ID: "GHSA-35jh-r3h4-6jhm", References: []osv.Reference{
+	v := osv.Vuln{ID: "GHSA-35jh-r3h4-6jhm", Aliases: []string{"CVE-2021-23337"}, References: []osv.Reference{
 		{Type: "WEB", URL: "https://example.com/blog"},
 		{Type: "ADVISORY", URL: "javascript:alert(1)"},
 		{Type: "ADVISORY", URL: "ftp://example.com/adv"},

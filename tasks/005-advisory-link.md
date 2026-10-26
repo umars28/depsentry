@@ -20,6 +20,10 @@ The "own IDs" of a vuln are its OSV `id` and its `aliases`. IDs in a URL are the
 | AC5.4 | ID matching is exact: `CVE-2021-1` does not match `CVE-2021-12`, and matching is case-insensitive (`ghsa-…` equals `GHSA-…`). |
 | AC5.5 | Regression: the reference list of GHSA-898c-q2cr-xwhg (aliases `CVE-2026-44490`; `ADVISORY` CVE-2018-16487 first, CVE-2026-44490 second) yields `https://nvd.nist.gov/vuln/detail/CVE-2026-44490` and the osv.dev link. |
 
+## Test changes
+
+- `TestLinks_AC3_5` built a vuln `GHSA-35jh-r3h4-6jhm` without aliases but expected its NVD link for `CVE-2021-23337`. Real OSV data lists that CVE as an alias, and under AC5.3 a CVE that is not an own ID is never linked. The test now sets `Aliases: CVE-2021-23337`; the expected links are unchanged.
+
 ## Out of scope
 
 - Showing more than one advisory link.
