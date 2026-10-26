@@ -69,6 +69,29 @@ func TestResolve_AC1_12_NonRegularFile(t *testing.T) {
 	}
 }
 
+func TestOpenRegular_AC1_12_FIFODoesNotBlock(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "package.json")
+	if err := syscall.Mkfifo(path, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() {
+		f, err := openRegular(path)
+		if f != nil {
+			f.Close()
+		}
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("openRegular blocked on a FIFO")
+	}
+}
+
 func TestResolve_AC1_12_SymlinkToRegularFile(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "real.json"), `{"dependencies": {"a": "^1.2.3"}}`)
