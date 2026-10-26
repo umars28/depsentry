@@ -31,25 +31,40 @@ func main() {
 
 func run(ctx context.Context, args []string, stdout, stderr io.Writer, osvURL string) int {
 	fs := flag.NewFlagSet("depsentry", flag.ContinueOnError)
-	fs.SetOutput(stderr)
+	fs.SetOutput(io.Discard)
+	fs.Usage = func() {}
 	timeout := fs.Duration("timeout", defaultTimeout, "overall deadline for the OSV queries")
-	fs.Usage = func() {
+	usage := func() {
 		fmt.Fprintln(stderr, usageLine)
+		fs.SetOutput(stderr)
 		fs.PrintDefaults()
+		fs.SetOutput(io.Discard)
 	}
+	usageError := func(err error) int {
+		fail(stderr, err)
+		usage()
+		return 2
+	}
+
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
+			usage()
 			return 0
 		}
-		return 2
+		return usageError(err)
 	}
-	if fs.NArg() != 1 || *timeout <= 0 {
-		fs.Usage()
-		return 2
+	if fs.NArg() != 1 {
+		return usageError(fmt.Errorf("expected exactly one project path, got %d", fs.NArg()))
+	}
+	if *timeout <= 0 {
+		return usageError(fmt.Errorf("--timeout must be positive, got %s", *timeout))
 	}
 
 	dependencies, err := deps.Resolve(fs.Arg(0))
 	if err != nil {
+		return fail(stderr, err)
+	}
+	if err := ctx.Err(); err != nil {
 		return fail(stderr, err)
 	}
 

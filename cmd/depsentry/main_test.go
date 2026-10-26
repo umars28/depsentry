@@ -395,3 +395,52 @@ func TestRun_AC4_8_ExitCodeIntegrity(t *testing.T) {
 		assertError(t, runCLI(t, context.Background(), url, fixture("vulnerable")))
 	})
 }
+
+func TestRun_AC4_1_ErrorPrefix(t *testing.T) {
+	cases := []struct {
+		name string
+		args []string
+	}{
+		{"unknown flag", []string{"--bogus", fixture("clean")}},
+		{"invalid timeout", []string{"--timeout", "soon", fixture("clean")}},
+		{"zero timeout", []string{"--timeout", "0s", fixture("clean")}},
+		{"no path", nil},
+		{"two paths", []string{fixture("clean"), fixture("clean")}},
+		{"hostile flag", []string{"--x" + string(rune(0x1b)) + "[2J" + string(rune(0x202e)), fixture("clean")}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, url := newFake(t)
+			out := runCLI(t, context.Background(), url, tc.args...)
+			if out.code != 2 {
+				t.Fatalf("exit = %d, want 2", out.code)
+			}
+			lines := strings.SplitN(out.stderr, "\n", 2)
+			if !strings.HasPrefix(lines[0], "depsentry: ") || len(lines) < 2 || !strings.HasPrefix(lines[1], "usage: depsentry") {
+				t.Fatalf("stderr = %q, want 'depsentry: <error>' followed by usage", out.stderr)
+			}
+			for _, r := range out.stderr {
+				if r != '\n' && r != '\t' && (r < 0x20 || r == 0x7f || r == 0x202e) {
+					t.Fatalf("stderr contains control rune %U: %q", r, out.stderr)
+				}
+			}
+		})
+	}
+}
+
+func TestRun_AC4_6_CancelledWithoutPackages(t *testing.T) {
+	for name, pkg := range map[string]string{
+		"all skipped":     `{"dependencies": {"a": "file:../a"}}`,
+		"no dependencies": `{"name": "empty"}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			f, url := newFake(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+			assertError(t, runCLI(t, ctx, url, writeProject(t, map[string]string{"package.json": pkg})))
+			if f.calls != 0 {
+				t.Fatalf("%d OSV calls, want none", f.calls)
+			}
+		})
+	}
+}
