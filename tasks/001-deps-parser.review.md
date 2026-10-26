@@ -41,3 +41,28 @@ Addressed after review, at the user's request, as new ACs with tests first:
 | reviewer 2 (lockfile version not validated) | AC1.13 | `2ada602` test, `b9fd0f7` fix |
 
 Remaining suggestions are left for later slices: reviewer 1, 3, 4; security-reviewer 2, 3, 4.
+
+## Round 2 (fixes `846bd8d`, `b9fd0f7`)
+
+### reviewer
+
+VERDICT: APPROVE
+
+| # | File:line | Issue | Required/Suggestion |
+|---|---|---|---|
+| 1 | internal/deps/deps.go:200-218 | Race between `os.Stat` and `os.Open`: a file swapped for a FIFO in that window blocks `os.Open` before the post-open check. Low risk; `O_NONBLOCK` on unix would close it. | Suggestion |
+| 2 | internal/deps/deps.go:224 | Size-limit error does not name the file; callers' wrapping already does. | Suggestion |
+
+Checked: test files unchanged since `2ada602`; lint and `go test -race` clean; AC1.12/AC1.13 implemented with the shared `exactVersion` regex, not test-targeted values. Accepts AC1.13 skipping instead of erroring: no range fallback, nothing sent to OSV, `SkipReason` keeps it visible. The report slice must show skipped packages and reasons clearly.
+
+### security-reviewer
+
+VERDICT: APPROVE
+
+| # | File:line | Issue | Severity | Required/Suggestion |
+|---|---|---|---|---|
+| 1 | internal/deps/deps.go:207 | Same `Stat`/`Open` race: swap to a FIFO can hang `open(2)`; the post-open `f.Stat` still prevents reading any non-regular file. Needs a concurrent local attacker, outside the threat model. | Low | Suggestion |
+| 2 | internal/deps/deps.go:99 | `Name` remains untrusted (round 1 finding 3) for the report and OSV slices. | Low | Suggestion (later slices) |
+| 3 | go.mod | Toolchain still go1.27.1; no reachable vulns. | Low | Suggestion |
+
+Checked: `Dependency.Version` is only set after passing the anchored `exactVersion` regex, so URLs, aliases and ANSI escapes cannot reach it; error text has no attacker-controlled data; tests have a watchdog against hangs; no new modules.
