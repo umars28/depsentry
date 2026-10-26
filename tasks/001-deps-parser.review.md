@@ -30,3 +30,14 @@ VERDICT: APPROVE
 | 4 | go.mod | govulncheck: no reachable vulns; go1.27.1 stdlib has advisories fixed in 1.27.2/1.27.3. Bump the toolchain before the HTTP slice. | Low | Suggestion |
 
 Checked: size-limited reads, malformed/deep JSON returns errors, read-only file access, no `os/exec`/env/writes, no new modules.
+
+## Follow-up
+
+Addressed after review, at the user's request, as new ACs with tests first:
+
+| Finding | AC | Commits |
+|---|---|---|
+| security-reviewer 1 (non-regular file hang) | AC1.12 | `2ada602` test, `846bd8d` fix |
+| reviewer 2 (lockfile version not validated) | AC1.13 | `2ada602` test, `b9fd0f7` fix |
+
+Remaining suggestions are left for later slices: reviewer 1, 3, 4; security-reviewer 2, 3, 4.
