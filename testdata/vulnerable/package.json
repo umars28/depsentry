@@ -1,0 +1,9 @@
+{
+  "name": "vulnerable-app",
+  "version": "1.0.0",
+  "dependencies": {
+    "express": "^4.18.2",
+    "lodash": "^4.17.0",
+    "mylib": "github:example/mylib"
+  }
+}
