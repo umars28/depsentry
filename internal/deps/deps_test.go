@@ -1,6 +1,8 @@
 package deps
 
 import (
+	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -253,6 +255,38 @@ func TestResolve_AC1_8_InexactRegistrySpec(t *testing.T) {
 				t.Fatalf("got %+v, want skipped with reason and no version", got)
 			}
 		})
+	}
+}
+
+func TestResolve_AC1_13_InexactLockVersion(t *testing.T) {
+	versions := []string{
+		"git+https://github.com/user/repo.git#abc123",
+		"https://registry.example.com/pkg/-/pkg-1.0.0.tgz",
+		"npm:other@1.0.0",
+		"1.x",
+		"latest",
+		"\u001b[31m1.0.0",
+	}
+	for _, v := range versions {
+		for _, lv := range []int{1, 3} {
+			t.Run(fmt.Sprintf("v%d/%s", lv, v), func(t *testing.T) {
+				vj, err := json.Marshal(v)
+				if err != nil {
+					t.Fatal(err)
+				}
+				var lock string
+				if lv == 1 {
+					lock = `{"lockfileVersion": 1, "dependencies": {"pkg": {"version": ` + string(vj) + `}}}`
+				} else {
+					lock = `{"lockfileVersion": 3, "packages": {"node_modules/pkg": {"version": ` + string(vj) + `}}}`
+				}
+				pkg := `{"dependencies": {"pkg": "^1.0.0"}}`
+				got := find(t, mustResolve(t, writeProject(t, pkg, lock)), "pkg")
+				if got.Source != SourceSkipped || got.SkipReason == "" || got.Version != "" {
+					t.Fatalf("lockfileVersion %d: got %+v, want skipped with reason and no version", lv, got)
+				}
+			})
+		}
 	}
 }
 
