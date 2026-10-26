@@ -9,6 +9,7 @@ import (
 	"math/rand/v2"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -80,6 +81,8 @@ var (
 	httpTimeout       = 30 * time.Second
 )
 
+var validVulnID = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$`)
+
 type Client struct {
 	baseURL    string
 	httpClient *http.Client
@@ -88,9 +91,14 @@ type Client struct {
 
 func New(baseURL string) *Client {
 	return &Client{
-		baseURL:    strings.TrimRight(baseURL, "/"),
-		httpClient: &http.Client{Timeout: httpTimeout},
-		sleep:      sleepContext,
+		baseURL: strings.TrimRight(baseURL, "/"),
+		httpClient: &http.Client{
+			Timeout: httpTimeout,
+			CheckRedirect: func(*http.Request, []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
+		},
+		sleep: sleepContext,
 	}
 }
 
@@ -195,8 +203,8 @@ func (c *Client) queryAll(ctx context.Context, pkgs []Package) ([][]string, erro
 					seen[idx] = map[string]bool{}
 				}
 				for _, v := range r.Vulns {
-					if v.ID == "" {
-						return nil, fmt.Errorf("querybatch: empty vuln id for package %q", pkgs[idx].Name)
+					if !validVulnID.MatchString(v.ID) {
+						return nil, fmt.Errorf("querybatch: invalid vuln id %q for package %q", v.ID, pkgs[idx].Name)
 					}
 					if seen[idx][v.ID] {
 						continue

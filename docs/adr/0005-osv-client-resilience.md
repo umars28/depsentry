@@ -31,6 +31,8 @@ Limits on untrusted responses:
 | `next_page_token` pages per package | 100 | error |
 | unique vuln IDs per package | 1000 | error, before any detail request |
 | unique vuln IDs in one run | 10000 | error, before any detail request |
+| vuln ID format | `^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$` | error, before any detail request |
+| HTTP redirects | not followed | a `3xx` is an error and is not retried, so package names in the POST body never reach another host |
 
 ## Alternatives
 

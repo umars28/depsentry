@@ -784,3 +784,72 @@ func TestCheck_AC2_12_VulnIDLimits(t *testing.T) {
 		}
 	})
 }
+
+func TestCheck_AC2_13_RedirectsNotFollowed(t *testing.T) {
+	cases := []struct {
+		name  string
+		batch bool
+		code  int
+	}{
+		{"batch 307", true, http.StatusTemporaryRedirect},
+		{"batch 308", true, http.StatusPermanentRedirect},
+		{"vuln 302", false, http.StatusFound},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var other atomic.Int32
+			target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				other.Add(1)
+				route(nil, nil).ServeHTTP(w, r)
+			}))
+			t.Cleanup(target.Close)
+			var calls atomic.Int32
+			redirect := func(w http.ResponseWriter, r *http.Request) {
+				calls.Add(1)
+				http.Redirect(w, r, target.URL+r.URL.Path, tc.code)
+			}
+			h := route(redirect, nil)
+			if !tc.batch {
+				h = route(nil, redirect)
+			}
+			c, _ := newTestClient(t, h)
+			got, err := c.Check(context.Background(), []Package{{Name: "lodash", Version: "4.17.15"}})
+			if err == nil || got != nil {
+				t.Fatalf("got %v, %v; want nil results and an error", got, err)
+			}
+			if other.Load() != 0 {
+				t.Fatalf("redirect target received %d requests, want none", other.Load())
+			}
+			if calls.Load() != 1 {
+				t.Fatalf("attempts = %d, want 1", calls.Load())
+			}
+		})
+	}
+}
+
+func TestCheck_AC2_14_VulnIDCharset(t *testing.T) {
+	valid := []string{"GHSA-29mw-wpgm-hmr9", "CVE-2021-23337", "PYSEC-2021:1.a_b", "a", strings.Repeat("a", 128)}
+	for _, id := range valid {
+		t.Run("valid/"+id[:min(len(id), 20)], func(t *testing.T) {
+			f := &fakeOSV{pages: map[string][][]string{"a": {{id}}}}
+			c, _ := newTestClient(t, f)
+			if _, err := c.Check(context.Background(), []Package{{Name: "a", Version: "1.0.0"}}); err != nil {
+				t.Fatalf("Check: %v", err)
+			}
+		})
+	}
+	invalid := []string{".", "..", "a/b", "a?b", "a#b", "a b", "-a", "a%2Fb", "\u001b[31mX", strings.Repeat("a", 129)}
+	for _, id := range invalid {
+		t.Run(fmt.Sprintf("invalid/%q", id[:min(len(id), 20)]), func(t *testing.T) {
+			f := &fakeOSV{pages: map[string][][]string{"a": {{id}}}}
+			c, _ := newTestClient(t, f)
+			got, err := c.Check(context.Background(), []Package{{Name: "a", Version: "1.0.0"}})
+			if err == nil || got != nil {
+				t.Fatalf("got %v, %v; want nil results and an error", got, err)
+			}
+			if len(f.vulnCalls) != 0 {
+				t.Fatalf("%d detail requests sent, want none", len(f.vulnCalls))
+			}
+		})
+	}
+}
