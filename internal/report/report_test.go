@@ -600,3 +600,38 @@ func TestLinks_AC5_4_Boundaries(t *testing.T) {
 		t.Fatalf("links = %v, want %v", got, want)
 	}
 }
+
+func TestLinks_AC5_6_DecodedPath(t *testing.T) {
+	const own = "https://nvd.nist.gov/vuln/detail/CVE-2026-44490"
+	const vendor = "https://vendor.example/bulletin/42"
+	cases := []struct {
+		name string
+		refs []string
+		want string
+	}{
+		{"own id only in query", []string{"https://evil.example/?x=CVE-2026-44490", own}, own},
+		{"own id only in fragment", []string{"https://evil.example/page#CVE-2026-44490", own}, own},
+		{"own id only in host", []string{"https://cve-2026-44490.evil.example/", own}, own},
+		{"own id only outside path and nothing else", []string{"https://evil.example/?x=CVE-2026-44490"}, ""},
+		{"percent-encoded own id in path", []string{"https://nvd.nist.gov/vuln/detail/CVE%2D2026%2D44490"}, "https://nvd.nist.gov/vuln/detail/CVE%2D2026%2D44490"},
+		{"percent-encoded foreign id in path", []string{"https://nvd.nist.gov/vuln/detail/CVE%2D2018%2D16487", vendor}, vendor},
+		{"foreign id in query", []string{"https://vendor.example/bulletin?ref=CVE-2018-16487", vendor}, vendor},
+		{"percent-encoded foreign id in query", []string{"https://vendor.example/bulletin?ref=CVE%2D2018%2D16487", vendor}, vendor},
+		{"foreign id in fragment", []string{"https://vendor.example/bulletin#GHSA-zzzz-yyyy-xxxx", vendor}, vendor},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			v := osv.Vuln{ID: "GHSA-898c-q2cr-xwhg", Aliases: []string{"CVE-2026-44490"}}
+			for _, u := range tc.refs {
+				v.References = append(v.References, osv.Reference{Type: "ADVISORY", URL: u})
+			}
+			want := []string{"https://osv.dev/vulnerability/GHSA-898c-q2cr-xwhg"}
+			if tc.want != "" {
+				want = append([]string{tc.want}, want...)
+			}
+			if got := links(v); !reflect.DeepEqual(got, want) {
+				t.Fatalf("links = %v, want %v", got, want)
+			}
+		})
+	}
+}

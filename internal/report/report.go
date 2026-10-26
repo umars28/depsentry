@@ -152,17 +152,22 @@ func links(v osv.Vuln) []string {
 
 	var matched, idFree string
 	for _, r := range v.References {
-		if r.Type != "ADVISORY" || !safeLink(r.URL) {
+		if r.Type != "ADVISORY" {
 			continue
 		}
-		matches := advisoryID.FindAllStringIndex(r.URL, -1)
+		u, ok := parseSafeLink(r.URL)
+		if !ok {
+			continue
+		}
+		parts := strings.Join([]string{u.Hostname(), u.Path, decodedQuery(u), u.Fragment}, " ")
+		matches := advisoryID.FindAllStringIndex(parts, -1)
 		if len(matches) == 0 {
 			if idFree == "" {
 				idFree = r.URL
 			}
 			continue
 		}
-		if allOwn(r.URL, matches, own) {
+		if allOwn(parts, matches, own) && advisoryID.MatchString(u.Path) {
 			matched = r.URL
 			break
 		}
@@ -178,9 +183,20 @@ func links(v osv.Vuln) []string {
 	return append(out, "https://osv.dev/vulnerability/"+url.PathEscape(v.ID))
 }
 
-func safeLink(raw string) bool {
+func parseSafeLink(raw string) (*url.URL, bool) {
 	u, err := url.Parse(raw)
-	return err == nil && (u.Scheme == "https" || u.Scheme == "http") && u.Host != "" && u.User == nil
+	if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" || u.User != nil {
+		return nil, false
+	}
+	return u, true
+}
+
+func decodedQuery(u *url.URL) string {
+	q, err := url.QueryUnescape(u.RawQuery)
+	if err != nil {
+		return u.RawQuery
+	}
+	return q
 }
 
 func allOwn(raw string, matches [][]int, own map[string]bool) bool {

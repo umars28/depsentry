@@ -14,7 +14,7 @@ The `severity` field in OSV holds a CVSS vector (e.g. `CVSS:3.1/AV:N/AC:L/...`),
 - Label from score: 0.0 NONE, 0.1–3.9 LOW, 4.0–6.9 MEDIUM, 7.0–8.9 HIGH, 9.0–10.0 CRITICAL.
 - If there is no vector or it fails to parse, fall back to `database_specific.severity` (GHSA label, e.g. `HIGH`), then `UNKNOWN`.
 - Fixed version: every `affected[].ranges[].events[].fixed` for the `affected[]` entries whose `package.name` and `ecosystem` match; empty is shown as `-`.
-- Link: one `ADVISORY` reference about this vulnerability, plus `https://osv.dev/vulnerability/<id>`. OSV does not order references and may list advisories of related vulnerabilities as `ADVISORY` (e.g. GHSA-898c-q2cr-xwhg lists CVE-2018-16487 before its own CVE-2026-44490). So the first `ADVISORY` URL that names one of the vuln's own IDs (`id` or `aliases`) and no other CVE/GHSA ID is used; otherwise the first one that names no ID at all; otherwise only the osv.dev link.
+- Link: one `ADVISORY` reference about this vulnerability, plus `https://osv.dev/vulnerability/<id>`. OSV does not order references and may list advisories of related vulnerabilities as `ADVISORY` (e.g. GHSA-898c-q2cr-xwhg lists CVE-2018-16487 before its own CVE-2026-44490). So the first `ADVISORY` URL whose decoded path names one of the vuln's own IDs (`id` or `aliases`), and whose host, decoded path, decoded query and fragment name no other CVE/GHSA ID, is used; otherwise the first one that names no ID anywhere; otherwise only the osv.dev link.
 
 ## Alternatives
 
