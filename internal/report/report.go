@@ -187,6 +187,13 @@ func truncate(s string, n int) string {
 	return string(runes[:n-1]) + "…"
 }
 
+func count(n int, singular, plural string) string {
+	if n == 1 {
+		return "1 " + singular
+	}
+	return fmt.Sprintf("%d %s", n, plural)
+}
+
 type entry struct {
 	vuln osv.Vuln
 	id   string
@@ -286,8 +293,9 @@ func Write(w io.Writer, dependencies []deps.Dependency, results []osv.Result) (S
 		}
 		counts = " (" + strings.Join(parts, ", ") + ")"
 	}
-	fmt.Fprintf(&b, "\nChecked %d packages: %d vulnerable, %d vulnerabilities%s, %d skipped.\n",
-		sum.Checked, sum.VulnerablePackages, sum.Vulns, counts, sum.Skipped)
+	fmt.Fprintf(&b, "\nChecked %s: %d vulnerable, %s%s, %d skipped.\n",
+		count(sum.Checked, "package", "packages"), sum.VulnerablePackages,
+		count(sum.Vulns, "vulnerability", "vulnerabilities"), counts, sum.Skipped)
 
 	if _, err := io.WriteString(w, b.String()); err != nil {
 		return Summary{}, fmt.Errorf("write report: %w", err)

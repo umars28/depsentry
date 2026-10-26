@@ -41,6 +41,7 @@ Applied at the user's request after round 1; not re-reviewed by the agents.
 | security 1 | AC3.9 | `3d5a5e6` | U+2028/U+2029 become spaces. |
 | security 2 | AC3.9 | `3d5a5e6` | All Unicode `Cf` characters are removed; this replaces the hand-listed bidi ranges. |
 | security 4 | AC3.5 | `3d5a5e6` | ADVISORY links with userinfo are ignored. |
+| found while writing the PR | AC3.8 | see `fix(report): use singular nouns for a count of one` | Summary line says `1 package` / `1 vulnerability` instead of `1 packages` / `1 vulnerabilities`. |
 
 The new tests were checked to fail against the code before the fix.
 

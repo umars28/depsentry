@@ -429,3 +429,19 @@ func TestLinks_AC3_5_Userinfo(t *testing.T) {
 		t.Fatalf("links = %v, want %v", got, want)
 	}
 }
+
+func TestWrite_AC3_8_SingularNouns(t *testing.T) {
+	dependencies := []deps.Dependency{
+		{Name: "lodash", Version: "4.17.15", Source: deps.SourceLockfile},
+		{Name: "mylib", Source: deps.SourceSkipped, SkipReason: "git dependency"},
+	}
+	results := []osv.Result{{Package: osv.Package{Name: "lodash", Version: "4.17.15"}, Vulns: []osv.Vuln{lodashVuln()}}}
+	var b strings.Builder
+	if _, err := Write(&b, dependencies, results); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	lines := strings.Split(strings.TrimSuffix(b.String(), "\n"), "\n")
+	if got, want := lines[len(lines)-1], "Checked 1 package: 1 vulnerable, 1 vulnerability (1 HIGH), 1 skipped."; got != want {
+		t.Fatalf("summary line = %q, want %q", got, want)
+	}
+}
