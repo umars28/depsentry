@@ -35,6 +35,12 @@ results, err := c.Check(ctx, []osv.Package{{Name: "lodash", Version: "4.17.15"}}
 | AC2.10 | The base URL is injectable via `New(baseURL)`; a trailing `/` does not produce `//` in request paths. |
 | AC2.11 | Network errors, `429` and `5xx` are retried up to 3 attempts per request with exponential backoff (base 500 ms, full jitter); `Retry-After` in seconds is honoured, capped at 10 s. Other `4xx`, malformed JSON and oversized bodies are not retried. After the last failed attempt `Check` returns an error. |
 | AC2.12 | More than 1000 unique vuln IDs for one package (across pages), or more than 10000 unique vuln IDs in one run, returns an error before any detail request is sent. Added from review 002, security finding 1. |
+| AC2.13 | HTTP redirects are not followed: a `3xx` response from either endpoint returns an error and is not retried, so the request body never reaches another host. Added from review 002, security finding 4. |
+| AC2.14 | A vuln ID from querybatch that does not match `^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$` (e.g. `..`, `a/b`, `a?b`, over 128 characters) returns an error before any detail request. Added from review 002, security finding 5. |
+
+## Test changes
+
+- `TestCheck_AC2_4_FetchDetailsOncePerID` used the vuln ID `ODD/ID?x` to show escaping. AC2.14 makes such IDs invalid, so the test now uses `PYSEC-2021:1.a_b`, a valid ID, and checks that the request path equals `url.PathEscape` of it. Invalid IDs are covered by the AC2.14 test.
 
 ## Out of scope
 

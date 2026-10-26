@@ -305,7 +305,7 @@ func TestCheck_AC2_4_FetchDetailsOncePerID(t *testing.T) {
 	full := `{"id":"GHSA-shared","aliases":["CVE-2021-23337"],"summary":"Command injection","severity":[{"type":"CVSS_V3","score":"CVSS:3.1/AV:N/AC:L/PR:H/UI:N/S:U/C:H/I:H/A:H"}],"affected":[{"package":{"name":"lodash","ecosystem":"npm"},"ranges":[{"type":"SEMVER","events":[{"introduced":"0"},{"fixed":"4.17.21"}]}]}],"references":[{"type":"ADVISORY","url":"https://nvd.nist.gov/vuln/detail/CVE-2021-23337"}],"database_specific":{"severity":"HIGH"}}`
 	f := &fakeOSV{
 		pages: map[string][][]string{
-			"a": {{"GHSA-shared", "ODD/ID?x"}},
+			"a": {{"GHSA-shared", "PYSEC-2021:1.a_b"}},
 			"b": {{"GHSA-shared"}},
 		},
 		details: map[string]string{"GHSA-shared": full},
@@ -315,12 +315,12 @@ func TestCheck_AC2_4_FetchDetailsOncePerID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Check: %v", err)
 	}
-	if f.vulnCalls["GHSA-shared"] != 1 || f.vulnCalls["ODD/ID?x"] != 1 {
+	if f.vulnCalls["GHSA-shared"] != 1 || f.vulnCalls["PYSEC-2021:1.a_b"] != 1 {
 		t.Errorf("vuln calls = %v, want each ID once", f.vulnCalls)
 	}
 	found := false
 	for _, p := range f.vulnPaths {
-		if p == "ODD%2FID%3Fx" {
+		if p == url.PathEscape("PYSEC-2021:1.a_b") {
 			found = true
 		}
 	}
@@ -344,7 +344,7 @@ func TestCheck_AC2_4_FetchDetailsOncePerID(t *testing.T) {
 			t.Errorf("result %d vuln = %+v\nwant %+v", i, r, want)
 		}
 	}
-	if got[0].Vulns[1].ID != "ODD/ID?x" {
+	if got[0].Vulns[1].ID != "PYSEC-2021:1.a_b" {
 		t.Errorf("second vuln of a = %q", got[0].Vulns[1].ID)
 	}
 }
