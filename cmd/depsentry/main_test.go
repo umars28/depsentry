@@ -319,13 +319,15 @@ func TestRun_AC4_5_Errors(t *testing.T) {
 
 func TestRun_AC4_6_Deadline(t *testing.T) {
 	t.Run("hanging server", func(t *testing.T) {
+		release := make(chan struct{})
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			select {
 			case <-r.Context().Done():
-			case <-time.After(10 * time.Second):
+			case <-release:
 			}
 		}))
 		t.Cleanup(srv.Close)
+		t.Cleanup(func() { close(release) })
 		start := time.Now()
 		out := runCLI(t, context.Background(), srv.URL, "--timeout", "200ms", fixture("vulnerable"))
 		assertError(t, out)
