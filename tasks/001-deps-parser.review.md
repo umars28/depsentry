@@ -95,3 +95,14 @@ VERDICT: APPROVE
 | 3 | go.mod:3 | Toolchain go1.27.1; no reachable vulns. Bump to 1.27.3. | Low | Suggestion |
 
 Checked: no remaining hang for FIFOs, devices or symlinks; `O_NONBLOCK` has no effect on regular-file reads; descriptors closed on every path; `!unix` path (Windows, plan9, wasip1) does not reintroduce a hang.
+
+## Round 3 follow-up
+
+Applied at the user's request, after the 3-round review limit, so not re-reviewed by the agents:
+
+| Finding | Commit | Change |
+|---|---|---|
+| security-reviewer 1 (device open side effects) | `200c336` | `os.Stat` before opening rejects non-regular targets early; the post-open `f.Stat` stays authoritative, so the race stays closed. |
+| security-reviewer 2 (controlling tty) | `2bb6f38` | `O_NOCTTY` added to the unix open flags. |
+
+No new tests: the device-open side effect and controlling-tty acquisition cannot be observed reliably in a unit test. The existing AC1.12 tests still cover FIFOs, devices, directories and symlinks, and `TestOpenRegular_AC1_12_FIFODoesNotBlock` still exercises the open path without the pre-check.
