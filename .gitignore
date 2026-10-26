@@ -1,0 +1,8 @@
+/bin/
+/dist/
+/depsentry
+*.test
+*.out
+coverage.*
+.DS_Store
+.claude/settings.local.json
