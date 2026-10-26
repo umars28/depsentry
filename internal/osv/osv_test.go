@@ -722,3 +722,65 @@ func TestCheck_AC2_11_RetryAfter(t *testing.T) {
 		})
 	}
 }
+
+func manyIDs(prefix string, n int) []string {
+	out := make([]string, n)
+	for i := range out {
+		out[i] = fmt.Sprintf("%s-%d", prefix, i)
+	}
+	return out
+}
+
+func TestCheck_AC2_12_VulnIDLimits(t *testing.T) {
+	if maxIDsPerPackage != 1000 || maxUniqueIDs != 10000 {
+		t.Fatalf("limits = %d/%d, want 1000/10000", maxIDsPerPackage, maxUniqueIDs)
+	}
+
+	t.Run("per package at limit", func(t *testing.T) {
+		f := &fakeOSV{pages: map[string][][]string{"a": {manyIDs("GHSA", 1000)}}}
+		c, _ := newTestClient(t, f)
+		got, err := c.Check(context.Background(), []Package{{Name: "a", Version: "1.0.0"}})
+		if err != nil {
+			t.Fatalf("Check: %v", err)
+		}
+		if len(got[0].Vulns) != 1000 {
+			t.Fatalf("got %d vulns, want 1000", len(got[0].Vulns))
+		}
+	})
+
+	t.Run("per package over limit across pages", func(t *testing.T) {
+		f := &fakeOSV{pages: map[string][][]string{"a": {manyIDs("A", 600), manyIDs("B", 401)}}}
+		c, _ := newTestClient(t, f)
+		got, err := c.Check(context.Background(), []Package{{Name: "a", Version: "1.0.0"}})
+		if err == nil || got != nil {
+			t.Fatalf("got %d results, %v; want nil results and an error", len(got), err)
+		}
+		if len(f.vulnCalls) != 0 {
+			t.Fatalf("%d detail requests sent, want none", len(f.vulnCalls))
+		}
+	})
+
+	t.Run("total unique", func(t *testing.T) {
+		orig := maxUniqueIDs
+		maxUniqueIDs = 5
+		t.Cleanup(func() { maxUniqueIDs = orig })
+		cases := []struct {
+			pages   map[string][][]string
+			wantErr bool
+		}{
+			{map[string][][]string{"a": {{"X-1", "X-2"}}, "b": {{"X-2", "X-3"}}, "c": {{"X-4", "X-5"}}}, false},
+			{map[string][][]string{"a": {{"X-1", "X-2"}}, "b": {{"X-3", "X-4"}}, "c": {{"X-5", "X-6"}}}, true},
+		}
+		for i, tc := range cases {
+			f := &fakeOSV{pages: tc.pages}
+			c, _ := newTestClient(t, f)
+			got, err := c.Check(context.Background(), []Package{{Name: "a", Version: "1"}, {Name: "b", Version: "1"}, {Name: "c", Version: "1"}})
+			if tc.wantErr != (err != nil) {
+				t.Fatalf("case %d: err = %v, wantErr %v", i, err, tc.wantErr)
+			}
+			if tc.wantErr && (got != nil || len(f.vulnCalls) != 0) {
+				t.Fatalf("case %d: got %d results and %d detail requests, want none", i, len(got), len(f.vulnCalls))
+			}
+		}
+	})
+}

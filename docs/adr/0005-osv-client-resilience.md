@@ -18,7 +18,7 @@ Retries, for both `POST /v1/querybatch` and `GET /v1/vulns/{id}` (the batch quer
 | Attempts | at most 3 per request |
 | Backoff | exponential with full jitter: base 500 ms, doubling per attempt |
 | `Retry-After` | honoured when present (seconds form), capped at 10 s |
-| Bound | the whole operation stays bounded by the HTTP timeout and the caller's context |
+| Bound | each attempt is bounded by the 30 s HTTP timeout; the overall run is bounded only by the caller's context, so the CLI must pass a context with a deadline |
 
 After the last attempt the error is returned, keeping ADR 0002's exit code 2.
 
@@ -29,6 +29,8 @@ Limits on untrusted responses:
 | querybatch response body | 32 MiB | error |
 | vuln detail response body | 4 MiB | error |
 | `next_page_token` pages per package | 100 | error |
+| unique vuln IDs per package | 1000 | error, before any detail request |
+| unique vuln IDs in one run | 10000 | error, before any detail request |
 
 ## Alternatives
 
@@ -41,6 +43,6 @@ Limits on untrusted responses:
 
 ## Consequences
 
-- A run can take up to a few extra seconds when OSV is flaky, still bounded by the timeout.
+- A run can take up to a few extra seconds when OSV is flaky. A persistently hanging server can stretch a run to several minutes per request chain, so the overall deadline belongs to the CLI.
 - Very large legitimate responses above the limits fail with exit 2; the limits are far above real OSV responses.
 - The backoff delay is injectable so tests do not sleep.

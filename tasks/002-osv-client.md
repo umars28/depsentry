@@ -34,6 +34,7 @@ results, err := c.Check(ctx, []osv.Package{{Name: "lodash", Version: "4.17.15"}}
 | AC2.9 | Response bodies are read through a size limit (querybatch 32 MiB, vuln detail 4 MiB); a larger body returns an error. Every response body is closed. |
 | AC2.10 | The base URL is injectable via `New(baseURL)`; a trailing `/` does not produce `//` in request paths. |
 | AC2.11 | Network errors, `429` and `5xx` are retried up to 3 attempts per request with exponential backoff (base 500 ms, full jitter); `Retry-After` in seconds is honoured, capped at 10 s. Other `4xx`, malformed JSON and oversized bodies are not retried. After the last failed attempt `Check` returns an error. |
+| AC2.12 | More than 1000 unique vuln IDs for one package (across pages), or more than 10000 unique vuln IDs in one run, returns an error before any detail request is sent. Added from review 002, security finding 1. |
 
 ## Out of scope
 

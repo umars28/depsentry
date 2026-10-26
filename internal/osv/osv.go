@@ -69,6 +69,8 @@ type Reference struct {
 var (
 	maxBatchQueries   = 1000
 	maxPages          = 100
+	maxIDsPerPackage  = 1000
+	maxUniqueIDs      = 10000
 	maxBatchBodyBytes = int64(32 << 20)
 	maxVulnBodyBytes  = int64(4 << 20)
 	maxAttempts       = 3
@@ -170,6 +172,7 @@ type batchResponse struct {
 
 func (c *Client) queryAll(ctx context.Context, pkgs []Package) ([][]string, error) {
 	ids := make([][]string, len(pkgs))
+	unique := map[string]bool{}
 	for start := 0; start < len(pkgs); start += maxBatchQueries {
 		end := min(start+maxBatchQueries, len(pkgs))
 		pending := make([]pendingQuery, 0, end-start)
@@ -195,9 +198,19 @@ func (c *Client) queryAll(ctx context.Context, pkgs []Package) ([][]string, erro
 					if v.ID == "" {
 						return nil, fmt.Errorf("querybatch: empty vuln id for package %q", pkgs[idx].Name)
 					}
-					if !seen[idx][v.ID] {
-						seen[idx][v.ID] = true
-						ids[idx] = append(ids[idx], v.ID)
+					if seen[idx][v.ID] {
+						continue
+					}
+					seen[idx][v.ID] = true
+					ids[idx] = append(ids[idx], v.ID)
+					if len(ids[idx]) > maxIDsPerPackage {
+						return nil, fmt.Errorf("querybatch: package %q has more than %d vulns", pkgs[idx].Name, maxIDsPerPackage)
+					}
+					if !unique[v.ID] {
+						unique[v.ID] = true
+						if len(unique) > maxUniqueIDs {
+							return nil, fmt.Errorf("querybatch: more than %d unique vulns", maxUniqueIDs)
+						}
 					}
 				}
 				if r.NextPageToken != "" {
