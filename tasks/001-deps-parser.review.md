@@ -70,3 +70,28 @@ Checked: `Dependency.Version` is only set after passing the anchored `exactVersi
 ## Round 2 follow-up
 
 The Stat/Open race (reviewer 1, security-reviewer 1) was closed at the user's request: `739c3cc` test, `c03007a` fix. On unix, files are opened with `O_NONBLOCK` and the type is checked only after opening, so a FIFO swapped in cannot block. Other platforms use a plain open and the same post-open check.
+
+## Round 3 (fix `c03007a`)
+
+### reviewer
+
+VERDICT: APPROVE
+
+| # | File:line | Issue | Required/Suggestion |
+|---|---|---|---|
+| 1 | internal/deps/open_unix.go:11 | Opening a device node still runs the driver's open before the type check. Only relevant for a hostile project tree; an `O_NOFOLLOW`/`Lstat` check would break AC1.12's symlink rule. | Suggestion |
+| 2 | internal/deps/deps.go:202,207 | `f.Close()` error ignored on error paths; acceptable for a read-only descriptor. | Suggestion |
+
+Checked: tests unchanged since `739c3cc`; missing lockfile still detected via `fs.ErrNotExist`; descriptors closed on every path; Stat/Open race closed; `GOOS=windows` vet and build clean; lint and `go test -race` clean.
+
+### security-reviewer
+
+VERDICT: APPROVE
+
+| # | File:line | Issue | Severity | Required/Suggestion |
+|---|---|---|---|---|
+| 1 | internal/deps/open_unix.go:11 | Without the pre-open `os.Stat`, a symlink to a character device is always opened; the driver's open/close side effects run (e.g. DTR on `/dev/ttyUSB*`). Re-add a pre-open `os.Stat` as a fast path, keeping the post-open `f.Stat` as authoritative. | Low | Suggestion |
+| 2 | internal/deps/open_unix.go:11 | No `O_NOCTTY`: on Linux a session leader without a controlling terminal could acquire a tty opened through a symlink. | Low | Suggestion |
+| 3 | go.mod:3 | Toolchain go1.27.1; no reachable vulns. Bump to 1.27.3. | Low | Suggestion |
+
+Checked: no remaining hang for FIFOs, devices or symlinks; `O_NONBLOCK` has no effect on regular-file reads; descriptors closed on every path; `!unix` path (Windows, plan9, wasip1) does not reintroduce a hang.
