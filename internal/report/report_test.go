@@ -554,3 +554,49 @@ func TestWrite_AC5_5_RegressionOutput(t *testing.T) {
 		t.Fatalf("output missing the matching advisory link:\n%s", b.String())
 	}
 }
+
+func TestLinks_AC3_5_UnsafeBeforeSafe(t *testing.T) {
+	cases := []struct {
+		name string
+		refs []osv.Reference
+		want string
+	}{
+		{"id-free path", []osv.Reference{
+			{Type: "ADVISORY", URL: "javascript:alert(1)"},
+			{Type: "ADVISORY", URL: "ftp://example.com/adv"},
+			{Type: "ADVISORY", URL: "https:///no-host"},
+			{Type: "ADVISORY", URL: "https://user@evil.example/adv"},
+			{Type: "ADVISORY", URL: "https://vendor.example/bulletin/42"},
+		}, "https://vendor.example/bulletin/42"},
+		{"own-id path", []osv.Reference{
+			{Type: "ADVISORY", URL: "javascript:alert('CVE-2021-23337')"},
+			{Type: "ADVISORY", URL: "ftp://example.com/CVE-2021-23337"},
+			{Type: "ADVISORY", URL: "https:///CVE-2021-23337"},
+			{Type: "ADVISORY", URL: "https://user@evil.example/CVE-2021-23337"},
+			{Type: "ADVISORY", URL: "https://nvd.nist.gov/vuln/detail/CVE-2021-23337"},
+		}, "https://nvd.nist.gov/vuln/detail/CVE-2021-23337"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			v := osv.Vuln{ID: "GHSA-35jh-r3h4-6jhm", Aliases: []string{"CVE-2021-23337"}, References: tc.refs}
+			want := []string{tc.want, "https://osv.dev/vulnerability/GHSA-35jh-r3h4-6jhm"}
+			if got := links(v); !reflect.DeepEqual(got, want) {
+				t.Fatalf("links = %v, want %v", got, want)
+			}
+		})
+	}
+}
+
+func TestLinks_AC5_4_Boundaries(t *testing.T) {
+	v := osv.Vuln{ID: "GHSA-aaaa-bbbb-cccc", Aliases: []string{"CVE-2021-1234"}, References: []osv.Reference{
+		{Type: "ADVISORY", URL: "https://github.com/advisories/GHSA-aaaa-bbbb-cccc-dddd"},
+		{Type: "ADVISORY", URL: "https://github.com/advisories/GHSA-aaaa-bbbb-ccccdddd"},
+		{Type: "ADVISORY", URL: "https://example.com/XCVE-2021-1234"},
+		{Type: "ADVISORY", URL: "https://example.com/CVE-2021-1234x"},
+		{Type: "ADVISORY", URL: "https://nvd.nist.gov/vuln/detail/CVE-2021-1234"},
+	}}
+	want := []string{"https://nvd.nist.gov/vuln/detail/CVE-2021-1234", "https://osv.dev/vulnerability/GHSA-aaaa-bbbb-cccc"}
+	if got := links(v); !reflect.DeepEqual(got, want) {
+		t.Fatalf("links = %v, want %v", got, want)
+	}
+}

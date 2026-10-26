@@ -155,14 +155,14 @@ func links(v osv.Vuln) []string {
 		if r.Type != "ADVISORY" || !safeLink(r.URL) {
 			continue
 		}
-		ids := advisoryID.FindAllString(r.URL, -1)
-		if len(ids) == 0 {
+		matches := advisoryID.FindAllStringIndex(r.URL, -1)
+		if len(matches) == 0 {
 			if idFree == "" {
 				idFree = r.URL
 			}
 			continue
 		}
-		if allOwn(ids, own) {
+		if allOwn(r.URL, matches, own) {
 			matched = r.URL
 			break
 		}
@@ -183,13 +183,28 @@ func safeLink(raw string) bool {
 	return err == nil && (u.Scheme == "https" || u.Scheme == "http") && u.Host != "" && u.User == nil
 }
 
-func allOwn(ids []string, own map[string]bool) bool {
-	for _, id := range ids {
-		if !own[strings.ToUpper(id)] {
+func allOwn(raw string, matches [][]int, own map[string]bool) bool {
+	for _, m := range matches {
+		id := raw[m[0]:m[1]]
+		if !own[strings.ToUpper(id)] || glued(raw, m[0], m[1], strings.HasPrefix(strings.ToUpper(id), "GHSA")) {
 			return false
 		}
 	}
 	return true
+}
+
+func glued(raw string, start, end int, ghsa bool) bool {
+	if start > 0 && isAlnum(raw[start-1]) {
+		return true
+	}
+	if end < len(raw) && isAlnum(raw[end]) {
+		return true
+	}
+	return ghsa && end+1 < len(raw) && raw[end] == '-' && isAlnum(raw[end+1])
+}
+
+func isAlnum(c byte) bool {
+	return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
 }
 
 var (
