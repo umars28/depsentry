@@ -196,26 +196,25 @@ func readLockfile(path string) (*lockfile, error) {
 	return &lock, nil
 }
 
-func readLimited(path string, limit int) ([]byte, error) {
-	info, err := os.Stat(path)
+func checkRegular(f *os.File) (*os.File, error) {
+	info, err := f.Stat()
 	if err != nil {
+		f.Close()
 		return nil, err
 	}
 	if !info.Mode().IsRegular() {
-		return nil, fmt.Errorf("%s is not a regular file", filepath.Base(path))
+		f.Close()
+		return nil, fmt.Errorf("%s is not a regular file", filepath.Base(f.Name()))
 	}
-	f, err := os.Open(path)
+	return f, nil
+}
+
+func readLimited(path string, limit int) ([]byte, error) {
+	f, err := openRegular(path)
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
-	info, err = f.Stat()
-	if err != nil {
-		return nil, err
-	}
-	if !info.Mode().IsRegular() {
-		return nil, fmt.Errorf("%s is not a regular file", filepath.Base(path))
-	}
 	data, err := io.ReadAll(io.LimitReader(f, int64(limit)+1))
 	if err != nil {
 		return nil, err
